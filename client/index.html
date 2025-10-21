@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Analisis & Prediksi Produksi Padi</title>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f4f8; 
+            color: #333;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        header {
+            background-color: #ffffff;
+            padding: 15px 40px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        nav button {
+            font-family: 'Poppins', sans-serif;
+            background: none;
+            border: 2px solid transparent;
+            padding: 8px 16px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 400;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        nav button.active {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+
+        nav button:not(.active):hover {
+            color: #3498db;
+            border-color: #3498db;
+        }
+        
+        main {
+            padding: 40px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        .container {
+            background-color: #ffffff;
+            padding: 30px 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            text-align: center;
+        }
+
+        #form-section .container {
+            max-width: 500px;
+        }
+
+        #prediction-form {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            text-align: left;
+        }
+        
+        h1, h2 {
+            color: #2c3e50;
+            margin-bottom: 25px;
+            font-weight: 600;
+        }
+        
+        label {
+            font-weight: 400;
+            color: #555;
+            margin-bottom: -10px;
+            display: block;
+        }
+        
+        input[type="text"],
+        input[type="number"],
+        select {
+            padding: 12px 15px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: 'Poppins', sans-serif;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
+            background-color: #fdfdfd;
+        }
+        
+        select:disabled {
+            background-color: #f2f2f2;
+            cursor: not-allowed;
+        }
+
+        input:focus,
+        select:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 5px rgba(52, 152, 219, 0.5);
+            outline: none;
+        }
+
+        button[type="submit"] {
+            font-family: 'Poppins', sans-serif;
+            background-color: #3498db;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+            margin-top: 10px;
+        }
+        
+        button[type="submit"]:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+        
+        hr {
+            border: none;
+            border-top: 1px solid #eee;
+            margin: 30px 0;
+        }
+        
+        #hasil-prediksi {
+            color: #555;
+            font-weight: 600;
+            font-size: 1.2rem;
+            min-height: 1.5em;
+            margin-top: 10px;
+            transition: color 0.3s ease;
+        }
+
+        #hasil-prediksi.sukses { color: #2ecc71; }
+        #hasil-prediksi.error, #hasil-prediksi:not(.sukses) { color: #e74c3c; }
+
+        #viz-section {
+            display: none; 
+            width: 100%;
+            max-width: 1200px;
+        }
+
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 40px;
+            margin-top: 20px;
+            align-items: center; 
+        }
+
+        .chart-card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+        }
+
+        .chart-card h3 {
+            text-align: center;
+            margin-top: 0;
+            margin-bottom: 20px;
+            color: #34495e;
+        }
+
+        .pie-chart-wrapper {
+            position: relative;
+            max-width: 380px; 
+            margin: 0 auto;
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">Proyek Sains Data Padi ZHINK</div>
+        <nav>
+            <button id="nav-form" class="active">Prediksi</button>
+            <button id="nav-viz">Visualisasi</button>
+        </nav>
+    </header>
+
+    <main>
+        <!-- Halaman Form Prediksi -->
+        <section id="form-section">
+            <div class="container">
+                <h1>Form Prediksi Produksi Padi</h1>
+                <form id="prediction-form">
+                    <label for="Crop_Year">Tahun Tanam (Crop_Year):</label>
+                    <input type="number" id="Crop_Year" name="Crop_Year" value="2014" required>
+        
+                    <label for="Area">Luas Area (Hektar):</label>
+                    <input type="number" id="Area" name="Area" value="50000" step="any" required>
+        
+                    <label for="State_Name">Nama Negara Bagian (State_Name):</label>
+                    <select id="State_Name" name="State_Name" required>
+                        <option value="">-- Memuat Negara Bagian --</option>
+                    </select>
+        
+                    <label for="District_Name">Nama Distrik (District_Name):</label>
+                    <select id="District_Name" name="District_Name" required disabled>
+                        <option value="">-- Pilih Negara Bagian dulu --</option>
+                    </select>
+        
+                    <label for="Season">Musim (Season):</label>
+                    <select id="Season" name="Season" required>
+                        <option value="">-- Memuat Musim --</option>
+                    </select>
+        
+                    <button type="submit">Prediksi</button>
+                </form>
+                <hr>
+                <h2>Hasil Prediksi Produksi:</h2>
+                <h3 id="hasil-prediksi">(Menunggu input...)</h3>
+            </div>
+        </section>
+
+        <!-- Halaman Visualisasi -->
+        <section id="viz-section">
+            <div class="container">
+                <h2>Visualisasi Data Produksi Padi Di India</h2>
+                <div class="charts-container">
+                    <div class="chart-card">
+                        <h3>Total Produksi per Tahun (Ton)</h3>
+                        <canvas id="yearChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Distribusi Produksi per Musim</h3>
+                        <div class="pie-chart-wrapper">
+                            <canvas id="seasonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            Chart.register(ChartDataLabels);
+
+            const navFormBtn = document.getElementById('nav-form');
+            const navVizBtn = document.getElementById('nav-viz');
+            const formSection = document.getElementById('form-section');
+            const vizSection = document.getElementById('viz-section');
+
+            const form = document.getElementById('prediction-form');
+            const hasilPrediksiEl = document.getElementById('hasil-prediksi');
+            const stateSelect = document.getElementById('State_Name');
+            const districtSelect = document.getElementById('District_Name');
+            const seasonSelect = document.getElementById('Season');
+
+            let stateDistrictMap = {};
+            let yearChartInstance = null;
+            let seasonChartInstance = null;
+
+            function showPage(page) {
+                if (page === 'form') {
+                    formSection.style.display = 'block';
+                    vizSection.style.display = 'none';
+                    navFormBtn.classList.add('active');
+                    navVizBtn.classList.remove('active');
+                } else if (page === 'viz') {
+                    formSection.style.display = 'none';
+                    vizSection.style.display = 'block';
+                    navFormBtn.classList.remove('active');
+                    navVizBtn.classList.add('active');
+                    loadChartData(); 
+                }
+            }
+
+            navFormBtn.addEventListener('click', () => showPage('form'));
+            navVizBtn.addEventListener('click', () => showPage('viz'));
+            
+            function populateDropdown(selectElement, options, defaultLabel) {
+                selectElement.innerHTML = `<option value="">-- ${defaultLabel} --</option>`;
+                options.forEach(option => {
+                    const opt = document.createElement('option');
+                    opt.value = option;
+                    opt.textContent = option;
+                    selectElement.appendChild(opt);
+                });
+            }
+            
+            fetch('http://127.0.0.1:5000/get_dropdown_data')
+                .then(response => response.ok ? response.json() : Promise.reject('Gagal mengambil data dropdown'))
+                .then(data => {
+                    if (data.error) throw new Error(data.error);
+                    stateDistrictMap = data.state_district_map;
+                    populateDropdown(stateSelect, data.states, 'Pilih Negara Bagian');
+                    populateDropdown(seasonSelect, data.seasons, 'Pilih Musim');
+                    districtSelect.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
+                })
+                .catch(error => {
+                    console.error('Error fetching dropdown data:', error);
+                    alert(`Tidak bisa memuat data dropdown: ${error.message}`);
+                });
+
+            stateSelect.addEventListener('change', () => {
+                const selectedState = stateSelect.value;
+                districtSelect.innerHTML = `<option value="">-- Pilih Distrik --</option>`;
+                if (selectedState && stateDistrictMap[selectedState]) {
+                    populateDropdown(districtSelect, stateDistrictMap[selectedState], 'Pilih Distrik');
+                    districtSelect.disabled = false;
+                } else {
+                    districtSelect.disabled = true;
+                    districtSelect.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
+                }
+            });
+
+            form.addEventListener('submit', (event) => {
+                event.preventDefault();
+                hasilPrediksiEl.textContent = 'Memproses...';
+                hasilPrediksiEl.className = '';
+
+                const formData = new FormData(form);
+                const data = {};
+                formData.forEach((value, key) => {
+                    data[key] = (key === 'Crop_Year' || key === 'Area') ? parseFloat(value.replace(',', '.')) : value;
+                });
+                
+                fetch('http://127.0.0.1:5000/predict', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.prediksi_ton !== undefined) {
+                        hasilPrediksiEl.textContent = `Prediksi Produksi: ${result.prediksi_ton.toFixed(2)} Ton`;
+                        hasilPrediksiEl.className = 'sukses';
+                    } else {
+                        hasilPrediksiEl.textContent = `Error: ${result.error || 'Respon tidak dikenal'}`;
+                        hasilPrediksiEl.className = 'error';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetch:', error);
+                    hasilPrediksiEl.textContent = `Error: Tidak bisa terhubung ke server.`;
+                    hasilPrediksiEl.className = 'error';
+                });
+            });
+
+            // --- Logika Visualisasi/Chart ---
+            function loadChartData() {
+                // Hanya fetch data jika chart belum dibuat
+                if (yearChartInstance || seasonChartInstance) return;
+
+                fetch('http://127.0.0.1:5000/get_chart_data')
+                    .then(response => response.ok ? response.json() : Promise.reject('Gagal mengambil data chart'))
+                    .then(data => {
+                        createYearChart(data.year_data);
+                        createSeasonChart(data.season_data);
+                    })
+                    .catch(error => {
+                        console.error('Error fetching chart data:', error);
+                        alert(`Tidak bisa memuat data visualisasi: ${error.message}`);
+                    });
+            }
+
+            function createYearChart(yearData) {
+                const ctx = document.getElementById('yearChart').getContext('2d');
+                yearChartInstance = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: yearData.labels,
+                        datasets: [{
+                            label: 'Total Produksi (Ton)',
+                            data: yearData.values,
+                            backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                            borderColor: 'rgba(52, 152, 219, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        scales: { y: { beginAtZero: true } }
+                    }
+                });
+            }
+
+            function createSeasonChart(seasonData) {
+                const ctx = document.getElementById('seasonChart').getContext('2d');
+                seasonChartInstance = new Chart(ctx, {
+                    type: 'pie',
+                    data: {
+                        labels: seasonData.labels,
+                        datasets: [{
+                            label: 'Total Produksi',
+                            data: seasonData.values,
+                            backgroundColor: [
+                                'rgba(26, 188, 156, 0.7)',
+                                'rgba(241, 196, 15, 0.7)',
+                                'rgba(230, 126, 34, 0.7)',
+                                'rgba(52, 152, 219, 0.7)',
+                                'rgba(155, 89, 182, 0.7)',
+                                'rgba(231, 76, 60, 0.7)'
+                            ],
+                            borderColor: '#fff',
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: true,
+                        plugins: {
+                            legend: { 
+                                position: 'top',
+                            },
+                            // Konfigurasi untuk plugin datalabels
+                            datalabels: {
+                                // Fungsi formatter untuk mengubah nilai menjadi persentase
+                                formatter: (value, ctx) => {
+                                    const datapoints = ctx.chart.data.datasets[0].data;
+                                    const total = datapoints.reduce((total, datapoint) => total + datapoint, 0);
+                                    const percentage = (value / total) * 100;
+                                    // Hanya tampilkan persentase jika lebih dari 1%
+                                    return percentage > 1 ? percentage.toFixed(1) + "%" : '';
+                                },
+                                color: '#fff', // Warna teks persentase
+                                font: {
+                                    weight: 'bold',
+                                    size: 14,
+                                }
+                            },
+                            // Konfigurasi untuk tooltip saat hover
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.raw !== null) {
+                                            // Format angka dengan pemisah ribuan
+                                            label += new Intl.NumberFormat('id-ID').format(context.raw) + ' Ton';
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>
+
