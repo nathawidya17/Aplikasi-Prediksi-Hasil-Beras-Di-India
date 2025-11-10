@@ -8,25 +8,86 @@ import os
 app = Flask(__name__)
 CORS(app) 
 
+# --- VARIABEL GLOBAL ---
+model = None
+scaler = None
+df_full_data = None
+unique_states = []
+unique_seasons = []
+state_district_map = {}
+# Salinan dari daftar kolom yang diharapkan model (akan diisi di 'try')
+model_columns_expected = []
+
 try:
+    print("--- Memulai Server ---")
     model = joblib.load('linear_regression_model.pkl')
     scaler = joblib.load('minmax_scaler.pkl')
-    model_columns_original = joblib.load('model_columns.pkl') 
-    model_columns_cleaned = [col.strip() for col in model_columns_original]
-
-    excel_file_path = 'rice_2013_2014.xlsx' 
-
-    if not os.path.exists(excel_file_path):
-        raise FileNotFoundError(f"File Excel tidak ditemukan di: {excel_file_path}")
-
-    df_full_data = pd.read_excel(excel_file_path)
     
+    # --- LOGIKA KOLOM BARU ---
+    # Kita tidak lagi memuat 'label_encoders.pkl' untuk nama kolom.
+    # Model itu sendiri mungkin menyimpan daftar fiturnya.
+    # Kita coba ambil dari model.
+    if hasattr(model, 'feature_names_in_'):
+        model_columns_expected = [col.strip() for col in model.feature_names_in_]
+        print(f"Berhasil memuat {len(model_columns_expected)} nama fitur dari model.")
+    else:
+        # Jika model tidak punya, kita 'load' label_encoders.pkl
+        # TAPI kita anggap itu DAFTAR (LIST)
+        print("Model tidak memiliki 'feature_names_in_', mencoba memuat 'label_encoders.pkl' sebagai gantinya...")
+        
+        # Ini adalah asumsi dari kode *asli* Anda.
+        model_columns_original = joblib.load('label_encoders.pkl')
+        
+        # Jika 'label_encoders.pkl' adalah DICT (seperti error sebelumnya), ambil 'keys'-nya
+        if isinstance(model_columns_original, dict):
+            print("PERINGATAN: 'label_encoders.pkl' adalah dict. Menggunakan 'keys' sebagai nama kolom.")
+            model_columns_expected = [col.strip() for col in model_columns_original.keys()]
+            
+            # Tambahkan 'Area' dan 'Crop_Year' jika tidak ada
+            if 'Area' not in model_columns_expected: model_columns_expected.insert(0, 'Area')
+            if 'Crop_Year' not in model_columns_expected: model_columns_expected.insert(1, 'Crop_Year')
+
+        # Jika itu LIST (yang kita harapkan)
+        elif isinstance(model_columns_original, list):
+            print("Berhasil memuat 'label_encoders.pkl' sebagai list.")
+            model_columns_expected = [col.strip() for col in model_columns_original]
+        
+        else:
+            raise TypeError("Tidak bisa menentukan nama kolom model. 'label_encoders.pkl' bukan list atau dict.")
+            
+        # Asumsi dari error pertama: 'Area' dan 'Crop_Year' mungkin hilang dari file .pkl
+        # Jadi kita pastikan mereka ada di model_columns_expected
+        if 'Area' not in model_columns_expected:
+            print("Menambahkan 'Area' ke daftar kolom.")
+            model_columns_expected.append('Area')
+        if 'Crop_Year' not in model_columns_expected:
+            print("Menambahkan 'Crop_Year' ke daftar kolom.")
+            model_columns_expected.append('Crop_Year')
+
+    print(f"Daftar kolom yang diharapkan model (dibersihkan): {model_columns_expected}")
+    # --- AKHIR LOGIKA KOLOM BARU ---
+
+    csv_file_path = 'data_produksi_padi_india.csv' 
+    if not os.path.exists(csv_file_path):
+        raise FileNotFoundError(f"File CSV tidak ditemukan di: {csv_file_path}")
+
+    df_full_data = pd.read_csv(csv_file_path)
+    
+    print("--- Pengecekan Kolom CSV ---")
     df_full_data.columns = df_full_data.columns.str.strip()
+    
+    required_csv_cols = ['State_Name', 'District_Name', 'Season', 'Crop_Year', 'Production']
+    missing_cols = [col for col in required_csv_cols if col not in df_full_data.columns]
+    
+    if missing_cols:
+        raise ValueError(f"KRITIS: Kolom penting hilang dari file CSV: {missing_cols}")
+    
+    print("Semua kolom CSV yang dibutuhkan (State_Name, District_Name, Season, Crop_Year, Production) ditemukan.")
+
     for col in df_full_data.select_dtypes(include=['object']).columns:
         df_full_data[col] = df_full_data[col].str.strip()
     
     df_full_data.dropna(subset=['Production'], inplace=True)
-
 
     unique_states = sorted(df_full_data['State_Name'].unique().tolist())
     unique_seasons = sorted(df_full_data['Season'].unique().tolist())
@@ -37,11 +98,10 @@ try:
 
 except Exception as e:
     print(f"!!! KRITIS: Gagal memuat file saat server dimulai !!!")
-    print(f"Error: {e}")
+    print(f"Error: {e}") 
     model = None 
-    df_full_data = None
-    unique_states, unique_seasons, state_district_map = [], [], {}
 
+# ... (GET CHART DATA tidak berubah) ...
 @app.route('/get_chart_data', methods=['GET'])
 def get_chart_data():
     if df_full_data is None:
@@ -66,7 +126,8 @@ def get_chart_data():
 
 @app.route('/get_dropdown_data', methods=['GET'])
 def get_dropdown_data():
-    if not unique_states:
+    # Cek 'unique_states' yang diisi saat startup
+    if not unique_states: 
         return jsonify({'error': 'Data dropdown tidak tersedia karena server gagal memuat file.'}), 500
     
     return jsonify({
@@ -83,23 +144,38 @@ def predict():
     try:
         data = request.get_json()
         print(f"Menerima data untuk prediksi: {data}")
+        
         for key in ['State_Name', 'District_Name', 'Season']:
             if key in data:
                 data[key] = data[key].strip()
 
+        # --- PERBAIKAN: Proses 'Area' ---
         area_value = float(data['Area'])
         scaled_area = scaler.transform([[area_value, 0]])[0][0]
         data['Area'] = scaled_area
         
+        data['Crop_Year'] = float(data['Crop_Year'])
+
         input_df = pd.DataFrame([data])
+        
+        # --- LOGIKA PREDIKSI BARU (LEBIH SEDERHANA) ---
+        
+        # 1. Buat Dummies. Kolom numerik ('Area', 'Crop_Year') akan diabaikan
         input_encoded = pd.get_dummies(input_df)
+        
+        # 2. Bersihkan NAMA KOLOM HASIL DUMMIES
         input_encoded.columns = [col.strip() for col in input_encoded.columns]
 
-        final_df_cleaned = input_encoded.reindex(columns=model_columns_cleaned, fill_value=0)
+        # 3. Reindex
+        #    'columns' akan diisi dengan daftar BERSIH yang kita buat saat startup
+        #    'fill_value=0' akan menangani distrik/state yang tidak ada di input
+        final_df = input_encoded.reindex(columns=model_columns_expected, fill_value=0)
         
-        final_df_cleaned.columns = model_columns_original
+        # 4. Prediksi
+        #    Kita tidak perlu 'rename' kolom lagi.
+        prediction_scaled = model.predict(final_df) 
         
-        prediction_scaled = model.predict(final_df_cleaned)
+        # --- AKHIR LOGIKA PREDIKSI BARU ---
         
         prediction_unscaled = scaler.inverse_transform([[0, prediction_scaled[0]]])[0][1]
         
@@ -112,4 +188,3 @@ def predict():
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)
-
