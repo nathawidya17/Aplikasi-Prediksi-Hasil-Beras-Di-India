@@ -71,7 +71,7 @@
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
             width: 100%;
             text-align: center;
-        }
+        } 
 
         #form-section .container {
             max-width: 500px;
@@ -95,6 +95,7 @@
             color: #555;
             margin-bottom: -10px;
             display: block;
+            text-align: left;
         }
         
         input[type="text"],
@@ -123,7 +124,7 @@
             outline: none;
         }
 
-        button[type="submit"] {
+        button[type="submit"], .viz-button {
             font-family: 'Poppins', sans-serif;
             background-color: #3498db;
             color: white;
@@ -137,7 +138,7 @@
             margin-top: 10px;
         }
         
-        button[type="submit"]:hover {
+        button[type="submit"]:hover, .viz-button:hover {
             background-color: #2980b9;
             transform: translateY(-2px);
         }
@@ -160,25 +161,55 @@
         #hasil-prediksi.sukses { color: #2ecc71; }
         #hasil-prediksi.error, #hasil-prediksi:not(.sukses) { color: #e74c3c; }
 
+        /* --- STYLING BARU UNTUK VISUALISASI --- */
         #viz-section {
             display: none; 
             width: 100%;
             max-width: 1200px;
         }
 
-        .charts-container {
+        .viz-filters-container {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
-            gap: 40px;
-            margin-top: 20px;
-            align-items: center; 
+            grid-template-columns: 2fr 2fr 2fr 1fr; /* 4 kolom */
+            gap: 20px;
+            margin-bottom: 25px;
+            align-items: end; /* Menjajarkan item ke bawah */
         }
+
+        .viz-filters-container div {
+            display: flex;
+            flex-direction: column;
+            gap: 5px; /* Jarak antara label dan input */
+        }
+
+        /* Menyesuaikan tombol agar sejajar */
+        .viz-filters-container button {
+            margin-top: 0; /* Hapus margin atas default */
+            height: 47px; /* Sesuaikan tinggi agar sama dengan input */
+        }
+
+        /* Responsif untuk filter */
+        @media (max-width: 900px) {
+            .viz-filters-container {
+                grid-template-columns: 1fr 1fr; /* 2 kolom di tablet */
+            }
+        }
+        @media (max-width: 600px) {
+            .viz-filters-container {
+                grid-template-columns: 1fr; /* 1 kolom di HP */
+            }
+            .viz-filters-container button {
+                 margin-top: 10px; /* Beri jarak lagi di mode 1 kolom */
+            }
+        }
+
 
         .chart-card {
             background: #fff;
             padding: 20px;
             border-radius: 12px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+            margin-top: 20px;
         }
 
         .chart-card h3 {
@@ -187,12 +218,7 @@
             margin-bottom: 20px;
             color: #34495e;
         }
-
-        .pie-chart-wrapper {
-            position: relative;
-            max-width: 380px; 
-            margin: 0 auto;
-        }
+        /* --- AKHIR STYLING BARU --- */
 
     </style>
 </head>
@@ -207,32 +233,31 @@
     </header>
 
     <main>
-        <!-- Halaman Form Prediksi -->
         <section id="form-section">
             <div class="container">
                 <h1>Form Prediksi Produksi Padi</h1>
                 <form id="prediction-form">
                     <label for="Crop_Year">Tahun Tanam (Crop_Year):</label>
-                    <input type="number" id="Crop_Year" name="Crop_Year" value="2014" required>
-        
+                    <input type="number" id="Crop_Year" name="Crop_Year" value="2024" required>
+            
                     <label for="Area">Luas Area (Hektar):</label>
                     <input type="number" id="Area" name="Area" value="50000" step="any" required>
-        
+            
                     <label for="State_Name">Nama Negara Bagian (State_Name):</label>
                     <select id="State_Name" name="State_Name" required>
                         <option value="">-- Memuat Negara Bagian --</option>
                     </select>
-        
+            
                     <label for="District_Name">Nama Distrik (District_Name):</label>
                     <select id="District_Name" name="District_Name" required disabled>
                         <option value="">-- Pilih Negara Bagian dulu --</option>
                     </select>
-        
+            
                     <label for="Season">Musim (Season):</label>
                     <select id="Season" name="Season" required>
                         <option value="">-- Memuat Musim --</option>
                     </select>
-        
+            
                     <button type="submit">Prediksi</button>
                 </form>
                 <hr>
@@ -241,45 +266,77 @@
             </div>
         </section>
 
-        <!-- Halaman Visualisasi -->
         <section id="viz-section">
             <div class="container">
-                <h2>Visualisasi Data Produksi Padi Di India</h2>
-                <div class="charts-container">
-                    <div class="chart-card">
-                        <h3>Total Produksi per Tahun (Ton)</h3>
-                        <canvas id="yearChart"></canvas>
+                <h2>Visualisasi Prediksi Tren Produksi</h2>
+                
+                <div class="viz-filters-container">
+                    <div>
+                        <label for="viz_State_Name">Negara Bagian:</label>
+                        <select id="viz_State_Name" name="State_Name" required>
+                            <option value="">-- Pilih Negara --</option>
+                        </select>
                     </div>
-                    <div class="chart-card">
-                        <h3>Distribusi Produksi per Musim</h3>
-                        <div class="pie-chart-wrapper">
-                            <canvas id="seasonChart"></canvas>
-                        </div>
+                    <div>
+                        <label for="viz_District_Name">Distrik:</label>
+                        <select id="viz_District_Name" name="District_Name" required disabled>
+                            <option value="">-- Pilih Negara dulu --</option>
+                        </select>
                     </div>
+                    <div>
+                        <label for="viz_Season">Musim:</label>
+                        <select id="viz_Season" name="Season" required>
+                            <option value="">-- Pilih Musim --</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="viz_Area">Luas Area (Ha):</label>
+                        <input type="number" id="viz_Area" name="Area" value="50000" step="any" required>
+                    </div>
+                    <button id="viz_generate_btn" class="viz-button">Tampilkan Prediksi</button>
                 </div>
+                
+                <div class="chart-card">
+                    <h3 id="prediction-chart-title">Prediksi Produksi Tahunan (2016 - Sekarang)</h3>
+                    <canvas id="predictionYearChart"></canvas>
+                </div>
+
             </div>
         </section>
     </main>
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
+            // Nonaktifkan plugin datalabels secara global (bisa diaktifkan per chart jika perlu)
             Chart.register(ChartDataLabels);
+            Chart.defaults.plugins.datalabels.display = false;
 
+            // --- Referensi Elemen Navigasi & Halaman ---
             const navFormBtn = document.getElementById('nav-form');
             const navVizBtn = document.getElementById('nav-viz');
             const formSection = document.getElementById('form-section');
             const vizSection = document.getElementById('viz-section');
 
+            // --- Referensi Elemen Form Prediksi ---
             const form = document.getElementById('prediction-form');
             const hasilPrediksiEl = document.getElementById('hasil-prediksi');
             const stateSelect = document.getElementById('State_Name');
             const districtSelect = document.getElementById('District_Name');
             const seasonSelect = document.getElementById('Season');
 
-            let stateDistrictMap = {};
-            let yearChartInstance = null;
-            let seasonChartInstance = null;
+            // --- Referensi Elemen BARU Form Visualisasi ---
+            const vizStateSelect = document.getElementById('viz_State_Name');
+            const vizDistrictSelect = document.getElementById('viz_District_Name');
+            const vizSeasonSelect = document.getElementById('viz_Season');
+            const vizAreaInput = document.getElementById('viz_Area');
+            const vizGenerateBtn = document.getElementById('viz_generate_btn');
+            const predictionChartTitle = document.getElementById('prediction-chart-title');
 
+            // --- Variabel Global ---
+            let stateDistrictMap = {};
+            let predictionYearChartInstance = null; // Instance untuk chart prediksi BARU
+
+            // --- Logika Navigasi ---
             function showPage(page) {
                 if (page === 'form') {
                     formSection.style.display = 'block';
@@ -291,13 +348,15 @@
                     vizSection.style.display = 'block';
                     navFormBtn.classList.remove('active');
                     navVizBtn.classList.add('active');
-                    loadChartData(); 
+                    // Kita TIDAK lagi memuat chart otomatis. 
+                    // Chart baru dimuat setelah tombol "Tampilkan" diklik.
                 }
             }
 
             navFormBtn.addEventListener('click', () => showPage('form'));
             navVizBtn.addEventListener('click', () => showPage('viz'));
             
+            // --- Logika Pengisian Dropdown ---
             function populateDropdown(selectElement, options, defaultLabel) {
                 selectElement.innerHTML = `<option value="">-- ${defaultLabel} --</option>`;
                 options.forEach(option => {
@@ -308,20 +367,29 @@
                 });
             }
             
+            // Fetch data dropdown SEKALI dan isi SEMUA form
             fetch('http://127.0.0.1:5000/get_dropdown_data')
                 .then(response => response.ok ? response.json() : Promise.reject('Gagal mengambil data dropdown'))
                 .then(data => {
                     if (data.error) throw new Error(data.error);
+                    
                     stateDistrictMap = data.state_district_map;
+                    
+                    // Isi dropdown Form Prediksi
                     populateDropdown(stateSelect, data.states, 'Pilih Negara Bagian');
                     populateDropdown(seasonSelect, data.seasons, 'Pilih Musim');
-                    districtSelect.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
+                    
+                    // Isi dropdown Form Visualisasi (BARU)
+                    populateDropdown(vizStateSelect, data.states, 'Pilih Negara Bagian');
+                    populateDropdown(vizSeasonSelect, data.seasons, 'Pilih Musim');
+
                 })
                 .catch(error => {
                     console.error('Error fetching dropdown data:', error);
                     alert(`Tidak bisa memuat data dropdown: ${error.message}`);
                 });
 
+            // Event listener untuk dropdown State di Form Prediksi
             stateSelect.addEventListener('change', () => {
                 const selectedState = stateSelect.value;
                 districtSelect.innerHTML = `<option value="">-- Pilih Distrik --</option>`;
@@ -334,6 +402,20 @@
                 }
             });
 
+            // Event listener BARU untuk dropdown State di Form Visualisasi
+            vizStateSelect.addEventListener('change', () => {
+                const selectedState = vizStateSelect.value;
+                vizDistrictSelect.innerHTML = `<option value="">-- Pilih Distrik --</option>`;
+                if (selectedState && stateDistrictMap[selectedState]) {
+                    populateDropdown(vizDistrictSelect, stateDistrictMap[selectedState], 'Pilih Distrik');
+                    vizDistrictSelect.disabled = false;
+                } else {
+                    vizDistrictSelect.disabled = true;
+                    vizDistrictSelect.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
+                }
+            });
+
+            // --- Logika Form Prediksi Tunggal ---
             form.addEventListener('submit', (event) => {
                 event.preventDefault();
                 hasilPrediksiEl.textContent = 'Memproses...';
@@ -367,99 +449,155 @@
                 });
             });
 
-            // --- Logika Visualisasi/Chart ---
-            function loadChartData() {
-                // Hanya fetch data jika chart belum dibuat
-                if (yearChartInstance || seasonChartInstance) return;
+            // --- Logika Visualisasi/Chart (BARU) ---
 
-                fetch('http://127.0.0.1:5000/get_chart_data')
-                    .then(response => response.ok ? response.json() : Promise.reject('Gagal mengambil data chart'))
-                    .then(data => {
-                        createYearChart(data.year_data);
-                        createSeasonChart(data.season_data);
-                    })
-                    .catch(error => {
-                        console.error('Error fetching chart data:', error);
-                        alert(`Tidak bisa memuat data visualisasi: ${error.message}`);
-                    });
-            }
+            // Listener untuk tombol "Tampilkan Prediksi"
+            vizGenerateBtn.addEventListener('click', () => {
+                const state = vizStateSelect.value;
+                const district = vizDistrictSelect.value;
+                const season = vizSeasonSelect.value;
+                const area = vizAreaInput.value;
 
-            function createYearChart(yearData) {
-                const ctx = document.getElementById('yearChart').getContext('2d');
-                yearChartInstance = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: yearData.labels,
-                        datasets: [{
-                            label: 'Total Produksi (Ton)',
-                            data: yearData.values,
-                            backgroundColor: 'rgba(52, 152, 219, 0.6)',
-                            borderColor: 'rgba(52, 152, 219, 1)',
-                            borderWidth: 1
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        scales: { y: { beginAtZero: true } }
+                // Validasi
+                if (!state || !district || !season || !area) {
+                    alert("Harap isi semua filter (Negara Bagian, Distrik, Musim, dan Luas Area).");
+                    return;
+                }
+
+                // Tampilkan status loading di judul chart
+                predictionChartTitle.textContent = "Memuat data prediksi...";
+
+                const filterData = {
+                    State_Name: state,
+                    District_Name: district,
+                    Season: season,
+                    Area: parseFloat(area)
+                };
+
+                // Panggil endpoint BARU
+                fetch('http://127.0.0.1:5000/get_prediction_chart_data', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(filterData)
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
                     }
+                    // Update judul chart
+                    predictionChartTitle.textContent = `Prediksi untuk ${district}, ${state} (${season})`;
+                    // Buat chart baru dengan data prediksi
+                    createPredictionChart(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching prediction chart data:', error);
+                    predictionChartTitle.textContent = "Gagal memuat data";
+                    alert(`Error: ${error.message}`);
                 });
-            }
+            });
 
-            function createSeasonChart(seasonData) {
-                const ctx = document.getElementById('seasonChart').getContext('2d');
-                seasonChartInstance = new Chart(ctx, {
-                    type: 'pie',
+            // Fungsi BARU untuk membuat chart prediksi
+            function createPredictionChart(data) {
+                const ctx = document.getElementById('predictionYearChart').getContext('2d');
+                
+                // Hancurkan chart lama jika ada
+                if (predictionYearChartInstance) {
+                    predictionYearChartInstance.destroy();
+                }
+
+                predictionYearChartInstance = new Chart(ctx, {
+                    type: 'bar', // Tipe default adalah bar
                     data: {
-                        labels: seasonData.labels,
-                        datasets: [{
-                            label: 'Total Produksi',
-                            data: seasonData.values,
-                            backgroundColor: [
-                                'rgba(26, 188, 156, 0.7)',
-                                'rgba(241, 196, 15, 0.7)',
-                                'rgba(230, 126, 34, 0.7)',
-                                'rgba(52, 152, 219, 0.7)',
-                                'rgba(155, 89, 182, 0.7)',
-                                'rgba(231, 76, 60, 0.7)'
-                            ],
-                            borderColor: '#fff',
-                            borderWidth: 2
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: true,
-                        plugins: {
-                            legend: { 
-                                position: 'top',
-                            },
-                            // Konfigurasi untuk plugin datalabels
-                            datalabels: {
-                                // Fungsi formatter untuk mengubah nilai menjadi persentase
-                                formatter: (value, ctx) => {
-                                    const datapoints = ctx.chart.data.datasets[0].data;
-                                    const total = datapoints.reduce((total, datapoint) => total + datapoint, 0);
-                                    const percentage = (value / total) * 100;
-                                    // Hanya tampilkan persentase jika lebih dari 1%
-                                    return percentage > 1 ? percentage.toFixed(1) + "%" : '';
-                                },
-                                color: '#fff', // Warna teks persentase
-                                font: {
-                                    weight: 'bold',
-                                    size: 14,
+                        labels: data.labels,
+                        datasets: [
+                            {
+                                label: 'Prediksi Produksi (Ton)',
+                                data: data.values,
+                                backgroundColor: 'rgba(52, 152, 219, 0.7)',
+                                borderColor: 'rgba(52, 152, 219, 1)',
+                                borderWidth: 1,
+                                yAxisID: 'yProduction', // Tautkan ke sumbu Y kiri
+                                datalabels: {
+                                    display: true,
+                                    anchor: 'end',
+                                    align: 'top',
+                                    formatter: (value) => Math.round(value).toLocaleString('id-ID'),
+                                    font: { weight: 'bold' }
                                 }
                             },
-                            // Konfigurasi untuk tooltip saat hover
+                            {
+                                label: 'Perubahan (%)',
+                                data: data.percent_changes,
+                                type: 'line', // Tipe dataset ini adalah line
+                                borderColor: 'rgba(231, 76, 60, 1)',
+                                backgroundColor: 'rgba(231, 76, 60, 0.2)',
+                                fill: false,
+                                tension: 0.1,
+                                yAxisID: 'yPercent', // Tautkan ke sumbu Y kanan
+                                datalabels: {
+                                    display: true,
+                                    align: 'bottom',
+                                    backgroundColor: '#eee',
+                                    borderRadius: 4,
+                                    formatter: (value) => {
+                                        if (value === 0) return ''; // Sembunyikan label 0%
+                                        return (value > 0 ? '+' : '') + value.toFixed(1) + '%';
+                                    },
+                                    color: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'green' : 'red'
+                                }
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        interaction: {
+                            mode: 'index',
+                            intersect: false,
+                        },
+                        scales: {
+                            x: {
+                                stacked: true,
+                            },
+                            // Sumbu Y Kiri untuk Produksi (Bar)
+                            yProduction: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Prediksi Produksi (Ton)'
+                                }
+                            },
+                            // Sumbu Y Kanan untuk Persentase (Line)
+                            yPercent: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Perubahan Tahunan (%)'
+                                },
+                                // Jangan gambar grid dari sumbu ini agar tidak tumpang tindih
+                                grid: {
+                                    drawOnChartArea: false, 
+                                }
+                            }
+                        },
+                        plugins: {
                             tooltip: {
                                 callbacks: {
                                     label: function(context) {
-                                        let label = context.label || '';
+                                        let label = context.dataset.label || '';
                                         if (label) {
                                             label += ': ';
                                         }
-                                        if (context.raw !== null) {
-                                            // Format angka dengan pemisah ribuan
-                                            label += new Intl.NumberFormat('id-ID').format(context.raw) + ' Ton';
+                                        if (context.parsed.y !== null) {
+                                            if (context.dataset.yAxisID === 'yPercent') {
+                                                label += context.parsed.y.toFixed(1) + '%';
+                                            } else {
+                                                label += context.parsed.y.toLocaleString('id-ID') + ' Ton';
+                                            }
                                         }
                                         return label;
                                     }
@@ -473,4 +611,3 @@
     </script>
 </body>
 </html>
-

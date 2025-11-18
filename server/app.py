@@ -1,190 +1,205 @@
-import joblib
-import pandas as pd
-import numpy as np
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
-import os
+import joblib
+import numpy as np
+import pandas as pd
+import datetime
 
 app = Flask(__name__)
-CORS(app) 
+CORS(app)  # Mengizinkan Cross-Origin Resource Sharing
 
-# --- VARIABEL GLOBAL ---
-model = None
-scaler = None
-df_full_data = None
-unique_states = []
-unique_seasons = []
-state_district_map = {}
-# Salinan dari daftar kolom yang diharapkan model (akan diisi di 'try')
-model_columns_expected = []
-
+# --- Pemuatan Model dan Data saat Startup ---
 try:
-    print("--- Memulai Server ---")
+    # Muat model, scaler, dan encoder yang sudah dilatih
     model = joblib.load('linear_regression_model.pkl')
     scaler = joblib.load('minmax_scaler.pkl')
+    label_encoders = joblib.load('label_encoders.pkl')
+
+    # Muat dataset asli HANYA untuk mendapatkan daftar unik untuk dropdown
+    # Ganti 'data_produksi_padi_india.csv' dengan path yang benar jika perlu
+    df = pd.read_csv('data_produksi_padi_india.csv')
     
-    # --- LOGIKA KOLOM BARU ---
-    # Kita tidak lagi memuat 'label_encoders.pkl' untuk nama kolom.
-    # Model itu sendiri mungkin menyimpan daftar fiturnya.
-    # Kita coba ambil dari model.
-    if hasattr(model, 'feature_names_in_'):
-        model_columns_expected = [col.strip() for col in model.feature_names_in_]
-        print(f"Berhasil memuat {len(model_columns_expected)} nama fitur dari model.")
-    else:
-        # Jika model tidak punya, kita 'load' label_encoders.pkl
-        # TAPI kita anggap itu DAFTAR (LIST)
-        print("Model tidak memiliki 'feature_names_in_', mencoba memuat 'label_encoders.pkl' sebagai gantinya...")
-        
-        # Ini adalah asumsi dari kode *asli* Anda.
-        model_columns_original = joblib.load('label_encoders.pkl')
-        
-        # Jika 'label_encoders.pkl' adalah DICT (seperti error sebelumnya), ambil 'keys'-nya
-        if isinstance(model_columns_original, dict):
-            print("PERINGATAN: 'label_encoders.pkl' adalah dict. Menggunakan 'keys' sebagai nama kolom.")
-            model_columns_expected = [col.strip() for col in model_columns_original.keys()]
-            
-            # Tambahkan 'Area' dan 'Crop_Year' jika tidak ada
-            if 'Area' not in model_columns_expected: model_columns_expected.insert(0, 'Area')
-            if 'Crop_Year' not in model_columns_expected: model_columns_expected.insert(1, 'Crop_Year')
-
-        # Jika itu LIST (yang kita harapkan)
-        elif isinstance(model_columns_original, list):
-            print("Berhasil memuat 'label_encoders.pkl' sebagai list.")
-            model_columns_expected = [col.strip() for col in model_columns_original]
-        
-        else:
-            raise TypeError("Tidak bisa menentukan nama kolom model. 'label_encoders.pkl' bukan list atau dict.")
-            
-        # Asumsi dari error pertama: 'Area' dan 'Crop_Year' mungkin hilang dari file .pkl
-        # Jadi kita pastikan mereka ada di model_columns_expected
-        if 'Area' not in model_columns_expected:
-            print("Menambahkan 'Area' ke daftar kolom.")
-            model_columns_expected.append('Area')
-        if 'Crop_Year' not in model_columns_expected:
-            print("Menambahkan 'Crop_Year' ke daftar kolom.")
-            model_columns_expected.append('Crop_Year')
-
-    print(f"Daftar kolom yang diharapkan model (dibersihkan): {model_columns_expected}")
-    # --- AKHIR LOGIKA KOLOM BARU ---
-
-    csv_file_path = 'data_produksi_padi_india.csv' 
-    if not os.path.exists(csv_file_path):
-        raise FileNotFoundError(f"File CSV tidak ditemukan di: {csv_file_path}")
-
-    df_full_data = pd.read_csv(csv_file_path)
+    # Buat daftar unik
+    unique_states = sorted(df['State_Name'].unique())
+    unique_seasons = sorted(df['Season'].unique())
     
-    print("--- Pengecekan Kolom CSV ---")
-    df_full_data.columns = df_full_data.columns.str.strip()
-    
-    required_csv_cols = ['State_Name', 'District_Name', 'Season', 'Crop_Year', 'Production']
-    missing_cols = [col for col in required_csv_cols if col not in df_full_data.columns]
-    
-    if missing_cols:
-        raise ValueError(f"KRITIS: Kolom penting hilang dari file CSV: {missing_cols}")
-    
-    print("Semua kolom CSV yang dibutuhkan (State_Name, District_Name, Season, Crop_Year, Production) ditemukan.")
+    # Buat pemetaan State -> District
+    state_district_map = {}
+    for state in unique_states:
+        districts = sorted(df[df['State_Name'] == state]['District_Name'].unique())
+        state_district_map[state] = districts
 
-    for col in df_full_data.select_dtypes(include=['object']).columns:
-        df_full_data[col] = df_full_data[col].str.strip()
-    
-    df_full_data.dropna(subset=['Production'], inplace=True)
+    print("Model, scaler, encoder, dan data dropdown berhasil dimuat.")
 
-    unique_states = sorted(df_full_data['State_Name'].unique().tolist())
-    unique_seasons = sorted(df_full_data['Season'].unique().tolist())
-    state_district_map = df_full_data.groupby('State_Name')['District_Name'].unique().apply(lambda x: sorted(x.tolist())).to_dict()
-
-    print("--- Server Siap ---")
-    print("Model, scaler, kolom, dan data dropdown/chart berhasil dimuat.")
-
+except FileNotFoundError as e:
+    print(f"Error: File model/data tidak ditemukan. {e}")
+    print("Pastikan file '.pkl' dan '.csv' berada di direktori yang sama dengan app.py")
+    # Set data ke None agar aplikasi tahu ada masalah
+    model = None
+    state_district_map = {}
+    unique_states = []
+    unique_seasons = []
 except Exception as e:
-    print(f"!!! KRITIS: Gagal memuat file saat server dimulai !!!")
-    print(f"Error: {e}") 
-    model = None 
+    print(f"Error saat memuat model: {e}")
+    model = None
+    state_district_map = {}
+    unique_states = []
+    unique_seasons = []
+# -----------------------------------------------
 
-# ... (GET CHART DATA tidak berubah) ...
-@app.route('/get_chart_data', methods=['GET'])
-def get_chart_data():
-    if df_full_data is None:
-        return jsonify({'error': 'Data untuk chart tidak tersedia.'}), 500
-    
-    year_production = df_full_data.groupby('Crop_Year')['Production'].sum()
-    
-    season_production = df_full_data.groupby('Season')['Production'].sum()
-
-    chart_data = {
-        'year_data': {
-            'labels': year_production.index.astype(str).tolist(),
-            'values': year_production.values.tolist()
-        },
-        'season_data': {
-            'labels': season_production.index.tolist(),
-            'values': season_production.values.tolist()
-        }
-    }
-    return jsonify(chart_data)
-
+@app.route('/')
+def index():
+    """Menyajikan halaman HTML utama."""
+    return render_template('index.html')
 
 @app.route('/get_dropdown_data', methods=['GET'])
 def get_dropdown_data():
-    # Cek 'unique_states' yang diisi saat startup
-    if not unique_states: 
-        return jsonify({'error': 'Data dropdown tidak tersedia karena server gagal memuat file.'}), 500
-    
+    """Mengirimkan data untuk mengisi form dropdown."""
+    if model is None:
+        return jsonify({"error": "Model tidak berhasil dimuat di server."}), 500
+        
     return jsonify({
-        'states': unique_states,
-        'seasons': unique_seasons,
-        'state_district_map': state_district_map
+        "states": unique_states,
+        "seasons": unique_seasons,
+        "state_district_map": state_district_map
     })
 
 @app.route('/predict', methods=['POST'])
 def predict():
+    """Memprediksi satu data point dari form utama."""
     if model is None:
-        return jsonify({'error': 'Server tidak siap untuk prediksi. Periksa log error di terminal.'}), 500
+        return jsonify({"error": "Model tidak berhasil dimuat di server."}), 500
 
     try:
-        data = request.get_json()
-        print(f"Menerima data untuk prediksi: {data}")
+        data = request.json
         
-        for key in ['State_Name', 'District_Name', 'Season']:
-            if key in data:
-                data[key] = data[key].strip()
+        # 1. Ambil data input
+        state_name = data['State_Name']
+        district_name = data['District_Name']
+        crop_year = int(data['Crop_Year'])
+        season = data['Season']
+        area = float(data['Area'])
 
-        # --- PERBAIKAN: Proses 'Area' ---
-        area_value = float(data['Area'])
-        scaled_area = scaler.transform([[area_value, 0]])[0][0]
-        data['Area'] = scaled_area
-        
-        data['Crop_Year'] = float(data['Crop_Year'])
+        # 2. Encode data kategorikal
+        state_encoded = label_encoders['State_Name'].transform([state_name])[0]
+        district_encoded = label_encoders['District_Name'].transform([district_name])[0]
+        season_encoded = label_encoders['Season'].transform([season])[0]
 
-        input_df = pd.DataFrame([data])
-        
-        # --- LOGIKA PREDIKSI BARU (LEBIH SEDERHANA) ---
-        
-        # 1. Buat Dummies. Kolom numerik ('Area', 'Crop_Year') akan diabaikan
-        input_encoded = pd.get_dummies(input_df)
-        
-        # 2. Bersihkan NAMA KOLOM HASIL DUMMIES
-        input_encoded.columns = [col.strip() for col in input_encoded.columns]
+        # 3. Transformasi logaritmik pada 'Area' (seperti saat training)
+        area_log = np.log1p(area)
 
-        # 3. Reindex
-        #    'columns' akan diisi dengan daftar BERSIH yang kita buat saat startup
-        #    'fill_value=0' akan menangani distrik/state yang tidak ada di input
-        final_df = input_encoded.reindex(columns=model_columns_expected, fill_value=0)
-        
-        # 4. Prediksi
-        #    Kita tidak perlu 'rename' kolom lagi.
-        prediction_scaled = model.predict(final_df) 
-        
-        # --- AKHIR LOGIKA PREDIKSI BARU ---
-        
-        prediction_unscaled = scaler.inverse_transform([[0, prediction_scaled[0]]])[0][1]
-        
-        print(f"Prediksi berhasil: {prediction_unscaled} Ton")
-        return jsonify({'prediksi_ton': prediction_unscaled})
+        # 4. Scaling 'Area'
+        # Scaler dilatih pada [Area, Production], jadi kita beri dummy 0 untuk Production
+        area_scaled = scaler.transform([[area_log, 0]])[0][0]
 
+        # 5. Siapkan fitur untuk model
+        # Urutan harus SAMA PERSIS seperti saat training
+        # Berdasarkan notebook: 'State_Name', 'District_Name', 'Crop_Year', 'Season', 'Area'
+        features = np.array([[
+            state_encoded,
+            district_encoded,
+            crop_year,
+            season_encoded,
+            area_scaled
+        ]])
+
+        # 6. Lakukan prediksi (hasilnya masih ter-scale)
+        prediction_scaled = model.predict(features)[0]
+
+        # 7. Inverse scaling pada hasil prediksi
+        # Kita beri dummy 0 untuk Area agar bisa inverse transform
+        prediction_log = scaler.inverse_transform([[0, prediction_scaled]])[0][1]
+
+        # 8. Inverse transformasi logaritmik (expm1 adalah kebalikan dari log1p)
+        prediction_ton = np.expm1(prediction_log)
+
+        return jsonify({'prediksi_ton': prediction_ton})
+
+    except KeyError as e:
+        return jsonify({'error': f'Input tidak lengkap: {e} tidak ditemukan.'}), 400
+    except ValueError as e:
+        return jsonify({'error': f'Input tidak valid: {e}. Pastikan angka diisi dengan benar.'}), 400
     except Exception as e:
-        print(f"Error saat proses prediksi: {e}")
-        return jsonify({'error': f'Terjadi kesalahan di server: {e}'}), 400
+        return jsonify({'error': f'Terjadi kesalahan saat prediksi: {str(e)}'}), 500
+
+@app.route('/get_prediction_chart_data', methods=['POST'])
+def get_prediction_chart_data():
+    """
+    Endpoint BARU: Membuat prediksi untuk rentang tahun 
+    berdasarkan filter yang diberikan.
+    """
+    if model is None:
+        return jsonify({"error": "Model tidak berhasil dimuat di server."}), 500
+
+    try:
+        data = request.json
+        
+        # 1. Ambil data filter
+        state_name = data['State_Name']
+        district_name = data['District_Name']
+        season = data['Season']
+        area = float(data['Area'])
+        
+        # Dapatkan tahun saat ini
+        current_year = datetime.datetime.now().year
+        # Tentukan rentang tahun (misal: 2016 s/d tahun ini)
+        START_YEAR = 2016
+        END_YEAR = current_year
+        YEARS_TO_PREDICT = list(range(START_YEAR, END_YEAR + 1))
+
+        # 2. Encode data kategorikal (hanya sekali)
+        state_encoded = label_encoders['State_Name'].transform([state_name])[0]
+        district_encoded = label_encoders['District_Name'].transform([district_name])[0]
+        season_encoded = label_encoders['Season'].transform([season])[0]
+
+        # 3. Transform & Scaling 'Area' (hanya sekali)
+        area_log = np.log1p(area)
+        area_scaled = scaler.transform([[area_log, 0]])[0][0]
+
+        predictions = []
+        
+        # 4. Loop untuk setiap tahun dan lakukan prediksi
+        for year in YEARS_TO_PREDICT:
+            features = np.array([[
+                state_encoded,
+                district_encoded,
+                year,
+                season_encoded,
+                area_scaled
+            ]])
+            
+            prediction_scaled = model.predict(features)[0]
+            prediction_log = scaler.inverse_transform([[0, prediction_scaled]])[0][1]
+            prediction_ton = np.expm1(prediction_log)
+            
+            # Atasi nilai negatif jika model memprediksi di bawah 0
+            predictions.append(max(0, prediction_ton))
+
+        # 5. Hitung persentase perubahan
+        percent_changes = [0.0]  # Tahun pertama tidak ada perubahan
+        for i in range(1, len(predictions)):
+            prev_val = predictions[i-1]
+            curr_val = predictions[i]
+            
+            if prev_val > 0:
+                change = ((curr_val - prev_val) / prev_val) * 100
+            elif curr_val > 0:
+                change = 100.0  # Dari 0 ke >0 dianggap naik 100%
+            else:
+                change = 0.0 # Dari 0 ke 0
+                
+            percent_changes.append(change)
+
+        return jsonify({
+            'labels': [str(y) for y in YEARS_TO_PREDICT],
+            'values': predictions,
+            'percent_changes': percent_changes
+        })
+
+    except KeyError as e:
+        return jsonify({'error': f'Filter tidak lengkap: {e} tidak ditemukan.'}), 400
+    except Exception as e:
+        return jsonify({'error': f'Gagal membuat data chart: {str(e)}'}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True)
