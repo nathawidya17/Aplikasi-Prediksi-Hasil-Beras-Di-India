@@ -9,6 +9,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
     
     <style>
+        /* CSS umum (tidak ada perubahan besar dari perbaikan sebelumnya) */
         body {
             font-family: 'Poppins', sans-serif;
             background-color: #f0f4f8; 
@@ -161,7 +162,7 @@
         #hasil-prediksi.sukses { color: #2ecc71; }
         #hasil-prediksi.error, #hasil-prediksi:not(.sukses) { color: #e74c3c; }
 
-        /* --- STYLING BARU UNTUK VISUALISASI --- */
+        /* --- STYLING VISUALISASI --- */
         #viz-section {
             display: none; 
             width: 100%;
@@ -170,40 +171,56 @@
 
         .viz-filters-container {
             display: grid;
-            grid-template-columns: 2fr 2fr 2fr 1fr; /* 4 kolom */
+            grid-template-columns: repeat(3, 1fr); 
             gap: 20px;
             margin-bottom: 25px;
-            align-items: end; /* Menjajarkan item ke bawah */
         }
 
         .viz-filters-container div {
             display: flex;
             flex-direction: column;
-            gap: 5px; /* Jarak antara label dan input */
+            gap: 5px; 
+            text-align: left; 
+        }
+        
+        #area-inputs-container {
+            text-align: left;
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            display: grid; 
+            gap: 20px; 
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); 
+        }
+        
+        #area-inputs-container h3 {
+             text-align: left;
+             margin-top: 0;
+             color: #34495e;
+             grid-column: 1 / -1; 
+             margin-bottom: 15px;
+        }
+        
+        #area-inputs-container div {
+            display: flex;
+            flex-direction: column;
+            gap: 5px; 
+            padding-bottom: 5px; 
         }
 
-        /* Menyesuaikan tombol agar sejajar */
-        .viz-filters-container button {
-            margin-top: 0; /* Hapus margin atas default */
-            height: 47px; /* Sesuaikan tinggi agar sama dengan input */
+        #area-inputs-container div label {
+            font-size: 0.9em; 
+            white-space: nowrap;
+            overflow: hidden; 
+            text-overflow: ellipsis; 
+            margin-bottom: 2px; 
         }
 
-        /* Responsif untuk filter */
-        @media (max-width: 900px) {
-            .viz-filters-container {
-                grid-template-columns: 1fr 1fr; /* 2 kolom di tablet */
-            }
+        #viz_generate_btn {
+            margin-top: 20px;
         }
-        @media (max-width: 600px) {
-            .viz-filters-container {
-                grid-template-columns: 1fr; /* 1 kolom di HP */
-            }
-            .viz-filters-container button {
-                 margin-top: 10px; /* Beri jarak lagi di mode 1 kolom */
-            }
-        }
-
-
+        
         .chart-card {
             background: #fff;
             padding: 20px;
@@ -218,8 +235,24 @@
             margin-bottom: 20px;
             color: #34495e;
         }
-        /* --- AKHIR STYLING BARU --- */
 
+        /* Responsif */
+        @media (max-width: 900px) {
+            .viz-filters-container {
+                grid-template-columns: 1fr 1fr; 
+            }
+            #generate_area_inputs_btn {
+                 grid-column: 1 / -1;
+            }
+        }
+        @media (max-width: 600px) {
+            .viz-filters-container {
+                grid-template-columns: 1fr; 
+            }
+            #generate_area_inputs_btn {
+                 grid-column: 1 / -1;
+            }
+        }
     </style>
 </head>
 <body>
@@ -235,7 +268,7 @@
     <main>
         <section id="form-section">
             <div class="container">
-                <h1>Form Prediksi Produksi Padi</h1>
+                <h1>Form Prediksi Produksi Padi Tunggal</h1>
                 <form id="prediction-form">
                     <label for="Crop_Year">Tahun Tanam (Crop_Year):</label>
                     <input type="number" id="Crop_Year" name="Crop_Year" value="2024" required>
@@ -289,15 +322,27 @@
                             <option value="">-- Pilih Musim --</option>
                         </select>
                     </div>
+                    
                     <div>
-                        <label for="viz_Area">Luas Area (Ha):</label>
-                        <input type="number" id="viz_Area" name="Area" value="50000" step="any" required>
+                        <label for="viz_Start_Year">Tahun Mulai:</label>
+                        <input type="number" id="viz_Start_Year" name="Start_Year" value="2016" min="2016" required>
                     </div>
-                    <button id="viz_generate_btn" class="viz-button">Tampilkan Prediksi</button>
+                    <div>
+                        <label for="viz_End_Year">Tahun Akhir:</label>
+                        <input type="number" id="viz_End_Year" name="End_Year" value="2020" required>
+                    </div>
+                    
+                    <button id="generate_area_inputs_btn" class="viz-button">Atur Area Tahun</button>
                 </div>
                 
+                <div id="area-inputs-container">
+                    <p>Masukkan Tahun Mulai & Tahun Akhir (Maks. 10 Tahun), lalu klik **Atur Area Tahun**.</p>
+                </div>
+                
+                <button id="viz_generate_btn" class="viz-button">Tampilkan Prediksi Tren</button>
+                
                 <div class="chart-card">
-                    <h3 id="prediction-chart-title">Prediksi Produksi Tahunan (2016 - Sekarang)</h3>
+                    <h3 id="prediction-chart-title">Prediksi Produksi Tahunan</h3>
                     <canvas id="predictionYearChart"></canvas>
                 </div>
 
@@ -307,36 +352,35 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', () => {
-            // Nonaktifkan plugin datalabels secara global (bisa diaktifkan per chart jika perlu)
             Chart.register(ChartDataLabels);
             Chart.defaults.plugins.datalabels.display = false;
 
-            // --- Referensi Elemen Navigasi & Halaman ---
+            // DOM References
             const navFormBtn = document.getElementById('nav-form');
             const navVizBtn = document.getElementById('nav-viz');
             const formSection = document.getElementById('form-section');
             const vizSection = document.getElementById('viz-section');
-
-            // --- Referensi Elemen Form Prediksi ---
             const form = document.getElementById('prediction-form');
             const hasilPrediksiEl = document.getElementById('hasil-prediksi');
             const stateSelect = document.getElementById('State_Name');
             const districtSelect = document.getElementById('District_Name');
             const seasonSelect = document.getElementById('Season');
 
-            // --- Referensi Elemen BARU Form Visualisasi ---
             const vizStateSelect = document.getElementById('viz_State_Name');
             const vizDistrictSelect = document.getElementById('viz_District_Name');
             const vizSeasonSelect = document.getElementById('viz_Season');
-            const vizAreaInput = document.getElementById('viz_Area');
+            const vizStartYearInput = document.getElementById('viz_Start_Year');
+            const vizEndYearInput = document.getElementById('viz_End_Year');
+            const generateAreaInputsBtn = document.getElementById('generate_area_inputs_btn');
+            const areaInputsContainer = document.getElementById('area-inputs-container');
             const vizGenerateBtn = document.getElementById('viz_generate_btn');
             const predictionChartTitle = document.getElementById('prediction-chart-title');
-
-            // --- Variabel Global ---
+            
             let stateDistrictMap = {};
-            let predictionYearChartInstance = null; // Instance untuk chart prediksi BARU
+            let predictionYearChartInstance = null;
+            let currentYearAreaData = []; // Variabel GLOBAL untuk menyimpan data area per tahun
 
-            // --- Logika Navigasi ---
+            // Logika Navigasi
             function showPage(page) {
                 if (page === 'form') {
                     formSection.style.display = 'block';
@@ -348,15 +392,12 @@
                     vizSection.style.display = 'block';
                     navFormBtn.classList.remove('active');
                     navVizBtn.classList.add('active');
-                    // Kita TIDAK lagi memuat chart otomatis. 
-                    // Chart baru dimuat setelah tombol "Tampilkan" diklik.
                 }
             }
-
             navFormBtn.addEventListener('click', () => showPage('form'));
             navVizBtn.addEventListener('click', () => showPage('viz'));
             
-            // --- Logika Pengisian Dropdown ---
+            // Logika Pengisian Dropdown
             function populateDropdown(selectElement, options, defaultLabel) {
                 selectElement.innerHTML = `<option value="">-- ${defaultLabel} --</option>`;
                 options.forEach(option => {
@@ -367,55 +408,43 @@
                 });
             }
             
-            // Fetch data dropdown SEKALI dan isi SEMUA form
             fetch('http://127.0.0.1:5000/get_dropdown_data')
-                .then(response => response.ok ? response.json() : Promise.reject('Gagal mengambil data dropdown'))
+                .then(response => response.ok ? response.json() : Promise.reject(new Error('Gagal mengambil data dropdown')))
                 .then(data => {
                     if (data.error) throw new Error(data.error);
-                    
                     stateDistrictMap = data.state_district_map;
-                    
-                    // Isi dropdown Form Prediksi
                     populateDropdown(stateSelect, data.states, 'Pilih Negara Bagian');
                     populateDropdown(seasonSelect, data.seasons, 'Pilih Musim');
-                    
-                    // Isi dropdown Form Visualisasi (BARU)
                     populateDropdown(vizStateSelect, data.states, 'Pilih Negara Bagian');
                     populateDropdown(vizSeasonSelect, data.seasons, 'Pilih Musim');
-
                 })
                 .catch(error => {
                     console.error('Error fetching dropdown data:', error);
                     alert(`Tidak bisa memuat data dropdown: ${error.message}`);
                 });
 
-            // Event listener untuk dropdown State di Form Prediksi
+            // Event listener untuk dropdown
             stateSelect.addEventListener('change', () => {
                 const selectedState = stateSelect.value;
-                districtSelect.innerHTML = `<option value="">-- Pilih Distrik --</option>`;
-                if (selectedState && stateDistrictMap[selectedState]) {
-                    populateDropdown(districtSelect, stateDistrictMap[selectedState], 'Pilih Distrik');
-                    districtSelect.disabled = false;
-                } else {
-                    districtSelect.disabled = true;
-                    districtSelect.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
-                }
+                populateDistricts(districtSelect, selectedState);
             });
-
-            // Event listener BARU untuk dropdown State di Form Visualisasi
             vizStateSelect.addEventListener('change', () => {
                 const selectedState = vizStateSelect.value;
-                vizDistrictSelect.innerHTML = `<option value="">-- Pilih Distrik --</option>`;
-                if (selectedState && stateDistrictMap[selectedState]) {
-                    populateDropdown(vizDistrictSelect, stateDistrictMap[selectedState], 'Pilih Distrik');
-                    vizDistrictSelect.disabled = false;
-                } else {
-                    vizDistrictSelect.disabled = true;
-                    vizDistrictSelect.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
-                }
+                populateDistricts(vizDistrictSelect, selectedState);
             });
+            
+            function populateDistricts(districtDropdown, selectedState) {
+                districtDropdown.innerHTML = `<option value="">-- Pilih Distrik --</option>`;
+                if (selectedState && stateDistrictMap[selectedState]) {
+                    populateDropdown(districtDropdown, stateDistrictMap[selectedState], 'Pilih Distrik');
+                    districtDropdown.disabled = false;
+                } else {
+                    districtDropdown.disabled = true;
+                    districtDropdown.innerHTML = `<option value="">-- Pilih Negara Bagian dulu --</option>`;
+                }
+            }
 
-            // --- Logika Form Prediksi Tunggal ---
+            // Logika Form Prediksi Tunggal
             form.addEventListener('submit', (event) => {
                 event.preventDefault();
                 hasilPrediksiEl.textContent = 'Memproses...';
@@ -435,7 +464,7 @@
                 .then(response => response.json())
                 .then(result => {
                     if (result.prediksi_ton !== undefined) {
-                        hasilPrediksiEl.textContent = `Prediksi Produksi: ${result.prediksi_ton.toFixed(2)} Ton`;
+                        hasilPrediksiEl.textContent = `Prediksi Produksi: ${result.prediksi_ton.toFixed(2).toLocaleString('id-ID')} Ton`;
                         hasilPrediksiEl.className = 'sukses';
                     } else {
                         hasilPrediksiEl.textContent = `Error: ${result.error || 'Respon tidak dikenal'}`;
@@ -449,33 +478,113 @@
                 });
             });
 
-            // --- Logika Visualisasi/Chart (BARU) ---
+            // -------------------------------------------------------------
+            // Logika Membuat Input Area Dinamis
+            // -------------------------------------------------------------
+            generateAreaInputsBtn.addEventListener('click', () => {
+                const startYear = parseInt(vizStartYearInput.value);
+                const endYear = parseInt(vizEndYearInput.value);
+                const maxRange = 10; 
+                
+                if (isNaN(startYear) || isNaN(endYear)) {
+                    alert("Harap masukkan Tahun Mulai dan Tahun Akhir yang valid.");
+                    return;
+                }
+                if (endYear <= startYear) {
+                    alert("Tahun Akhir harus lebih besar atau sama dengan Tahun Mulai.");
+                    return;
+                }
+                if ((endYear - startYear + 1) > maxRange) {
+                    alert(`Rentang tahun terlalu besar (maks ${maxRange} tahun).`);
+                    return;
+                }
+                
+                // Hapus input yang sudah ada
+                areaInputsContainer.innerHTML = '<h3>Input Luas Area per Tahun (Hektar)</h3>';
+                areaInputsContainer.style.display = 'grid';
+                areaInputsContainer.style.gridTemplateColumns = 'repeat(auto-fit, minmax(160px, 1fr))';
+                areaInputsContainer.style.gap = '20px';
 
-            // Listener untuk tombol "Tampilkan Prediksi"
+                for (let year = startYear; year <= endYear; year++) {
+                    const defaultArea = 50000; 
+                    
+                    const div = document.createElement('div');
+                    div.style.textAlign = 'left';
+                    
+                    const label = document.createElement('label');
+                    label.textContent = `Tahun ${year}:`;
+                    label.setAttribute('for', `area_input_${year}`);
+                    
+                    const input = document.createElement('input');
+                    input.type = 'number';
+                    input.id = `area_input_${year}`;
+                    input.name = `Area_${year}`;
+                    input.value = defaultArea;
+                    input.min = '0';
+                    input.step = 'any';
+                    input.required = true;
+                    
+                    div.appendChild(label);
+                    div.appendChild(input);
+                    areaInputsContainer.appendChild(div);
+                }
+            });
+
+            // -------------------------------------------------------------
+            // Logika Prediksi untuk Chart (Termasuk Penyimpanan Data Area)
+            // -------------------------------------------------------------
             vizGenerateBtn.addEventListener('click', () => {
                 const state = vizStateSelect.value;
                 const district = vizDistrictSelect.value;
                 const season = vizSeasonSelect.value;
-                const area = vizAreaInput.value;
-
-                // Validasi
-                if (!state || !district || !season || !area) {
-                    alert("Harap isi semua filter (Negara Bagian, Distrik, Musim, dan Luas Area).");
+                
+                if (!state || !district || !season) {
+                    alert("Harap isi semua filter statis (Negara, Distrik, Musim).");
                     return;
                 }
+                
+                const inputs = areaInputsContainer.querySelectorAll('input[type="number"]');
+                if (inputs.length === 0) {
+                    alert("Harap tentukan Rentang Tahun dan klik 'Atur Area Tahun' terlebih dahulu.");
+                    return;
+                }
+                
+                const finalYearAreaData = [];
+                let isValid = true;
+                
+                inputs.forEach(input => {
+                    const yearMatch = input.id.match(/area_input_(\d+)/);
+                    if (yearMatch) {
+                        const year = parseInt(yearMatch[1]);
+                        const area = parseFloat(input.value);
+                        
+                        if (isNaN(area) || area < 0) {
+                            alert(`Nilai Area untuk Tahun ${year} tidak valid.`);
+                            isValid = false;
+                            return;
+                        }
+                        finalYearAreaData.push({
+                            year: year,
+                            area: area
+                        });
+                    }
+                });
+                
+                if (!isValid) return; 
 
-                // Tampilkan status loading di judul chart
+                // --- PERUBAHAN UTAMA UNTUK TOOLTIP: SIMPAN DATA AREA ---
+                currentYearAreaData = finalYearAreaData; 
+
                 predictionChartTitle.textContent = "Memuat data prediksi...";
 
                 const filterData = {
                     State_Name: state,
                     District_Name: district,
                     Season: season,
-                    Area: parseFloat(area)
+                    year_area_data: finalYearAreaData
                 };
 
-                // Panggil endpoint BARU
-                fetch('http://127.0.0.1:5000/get_prediction_chart_data', {
+                fetch('http://127.0.0.1:5000/get_prediction_chart_data_multi_area', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(filterData)
@@ -485,9 +594,7 @@
                     if (data.error) {
                         throw new Error(data.error);
                     }
-                    // Update judul chart
                     predictionChartTitle.textContent = `Prediksi untuk ${district}, ${state} (${season})`;
-                    // Buat chart baru dengan data prediksi
                     createPredictionChart(data);
                 })
                 .catch(error => {
@@ -497,17 +604,22 @@
                 });
             });
 
-            // Fungsi BARU untuk membuat chart prediksi
+            // Fungsi untuk membuat chart (PERBAIKAN: tension line chart dan Tooltip)
             function createPredictionChart(data) {
                 const ctx = document.getElementById('predictionYearChart').getContext('2d');
                 
-                // Hancurkan chart lama jika ada
                 if (predictionYearChartInstance) {
                     predictionYearChartInstance.destroy();
                 }
 
+                // Buat Map untuk mencari Area berdasarkan Tahun dengan cepat
+                const areaMap = new Map();
+                currentYearAreaData.forEach(item => {
+                    areaMap.set(String(item.year), item.area);
+                });
+                
                 predictionYearChartInstance = new Chart(ctx, {
-                    type: 'bar', // Tipe default adalah bar
+                    type: 'bar',
                     data: {
                         labels: data.labels,
                         datasets: [
@@ -517,34 +629,35 @@
                                 backgroundColor: 'rgba(52, 152, 219, 0.7)',
                                 borderColor: 'rgba(52, 152, 219, 1)',
                                 borderWidth: 1,
-                                yAxisID: 'yProduction', // Tautkan ke sumbu Y kiri
+                                yAxisID: 'yProduction', 
                                 datalabels: {
-                                    display: true,
-                                    anchor: 'end',
-                                    align: 'top',
-                                    formatter: (value) => Math.round(value).toLocaleString('id-ID'),
-                                    font: { weight: 'bold' }
+                                    display: false 
                                 }
                             },
                             {
                                 label: 'Perubahan (%)',
                                 data: data.percent_changes,
-                                type: 'line', // Tipe dataset ini adalah line
+                                type: 'line', 
                                 borderColor: 'rgba(231, 76, 60, 1)',
                                 backgroundColor: 'rgba(231, 76, 60, 0.2)',
                                 fill: false,
-                                tension: 0.1,
-                                yAxisID: 'yPercent', // Tautkan ke sumbu Y kanan
+                                tension: 0.4, /* Line chart lebih smooth */
+                                yAxisID: 'yPercent',
                                 datalabels: {
                                     display: true,
-                                    align: 'bottom',
-                                    backgroundColor: '#eee',
+                                    anchor: 'end',
+                                    align: 'top',
+                                    backgroundColor: 'rgba(255, 255, 255, 0.7)',
                                     borderRadius: 4,
+                                    padding: 4,
+                                    font: {
+                                        weight: 'bold'
+                                    },
                                     formatter: (value) => {
-                                        if (value === 0) return ''; // Sembunyikan label 0%
+                                        if (value === 0) return ''; 
                                         return (value > 0 ? '+' : '') + value.toFixed(1) + '%';
                                     },
-                                    color: (context) => context.dataset.data[context.dataIndex] >= 0 ? 'green' : 'red'
+                                    color: (context) => context.dataset.data[context.dataIndex] >= 0 ? '#27ae60' : '#e74c3c'
                                 }
                             }
                         ]
@@ -557,9 +670,8 @@
                         },
                         scales: {
                             x: {
-                                stacked: true,
+                                stacked: false,
                             },
-                            // Sumbu Y Kiri untuk Produksi (Bar)
                             yProduction: {
                                 type: 'linear',
                                 display: true,
@@ -569,7 +681,6 @@
                                     text: 'Prediksi Produksi (Ton)'
                                 }
                             },
-                            // Sumbu Y Kanan untuk Persentase (Line)
                             yPercent: {
                                 type: 'linear',
                                 display: true,
@@ -578,7 +689,6 @@
                                     display: true,
                                     text: 'Perubahan Tahunan (%)'
                                 },
-                                // Jangan gambar grid dari sumbu ini agar tidak tumpang tindih
                                 grid: {
                                     drawOnChartArea: false, 
                                 }
@@ -587,6 +697,20 @@
                         plugins: {
                             tooltip: {
                                 callbacks: {
+                                    // PANGGILAN BARU UNTUK HEADER (Menampilkan Area)
+                                    title: function(tooltipItems) {
+                                        const year = tooltipItems[0].label;
+                                        const area = areaMap.get(year);
+                                        const areaFormatted = area ? area.toLocaleString('id-ID', { maximumFractionDigits: 0 }) : 'N/A';
+                                        
+                                        // Baris pertama: Tahun
+                                        let title = `Tahun ${year}`;
+                                        
+                                        // Baris kedua: Luas Area (Hektar)
+                                        title += `\nLuas Area: ${areaFormatted} Ha`;
+                                        return title;
+                                    },
+                                    // PANGGILAN ASLI UNTUK LABEL
                                     label: function(context) {
                                         let label = context.dataset.label || '';
                                         if (label) {
@@ -594,13 +718,25 @@
                                         }
                                         if (context.parsed.y !== null) {
                                             if (context.dataset.yAxisID === 'yPercent') {
-                                                label += context.parsed.y.toFixed(1) + '%';
+                                                label = context.parsed.y.toFixed(1) + '%';
                                             } else {
-                                                label += context.parsed.y.toLocaleString('id-ID') + ' Ton';
+                                                label += context.parsed.y.toLocaleString('id-ID', { maximumFractionDigits: 2 }) + ' Ton';
                                             }
                                         }
                                         return label;
                                     }
+                                }
+                            },
+                             datalabels: {
+                                color: '#333',
+                                anchor: 'end',
+                                align: 'top',
+                                offset: 8,
+                                formatter: function(value, context) {
+                                    if (context.dataset.yAxisID === 'yProduction' && value > 0) {
+                                        return value.toLocaleString('id-ID', { maximumFractionDigits: 0 }); 
+                                    }
+                                    return null;
                                 }
                             }
                         }
